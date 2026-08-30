@@ -1,7 +1,7 @@
 {
-  "name": "Hanium Traffic CCTV",
-  "short_name": "Hanium Traffic",
-  "description": "GPS 기반 CCTV 교통 위험 분석 PWA",
+  "name": "교통안전 CCTV 모니터링",
+  "short_name": "Traffic Monitor",
+  "description": "교통안전 CCTV 모니터링",
   "start_url": "./#/",
   "scope": "./",
   "display": "standalone",
