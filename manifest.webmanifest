@@ -1,7 +1,7 @@
 {
-  "name": "교통안전 CCTV 모니터링",
-  "short_name": "Traffic Monitor",
-  "description": "교통안전 CCTV 모니터링",
+  "name": "Traffic 도우미",
+  "short_name": "Traffic 도우미",
+  "description": "주변 교통 상황과 차량 위험 정보를 확인하는 교통 도우미",
   "start_url": "./#/",
   "scope": "./",
   "display": "standalone",
