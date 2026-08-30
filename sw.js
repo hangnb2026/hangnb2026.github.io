@@ -4,7 +4,7 @@
  *
  * 캐시 이름을 변경하면 이전 버전 캐시도 activate 단계에서 삭제됩니다.
  */
-const CACHE_NAME = "traffic-monitor-shell-v6";
+const CACHE_NAME = "traffic-helper-shell-v7";
 
 const APP_SHELL = [
   "./",
