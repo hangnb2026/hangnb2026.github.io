@@ -1,8 +1,6 @@
 import {
   CCTV_LIST,
-  getCctv,
-  RELEASE,
-  DEFAULT_SETTINGS
+  getCctv
 } from "./config.js";
 
 import {
@@ -88,12 +86,16 @@ function toast(message) {
 
 function setTopbar({
   title,
-  eyebrow = "Hanium Traffic",
+  eyebrow = "",
   showBack = false,
   actionHtml = ""
 }) {
   topTitle.textContent = title;
   topEyebrow.textContent = eyebrow;
+  topEyebrow.classList.toggle(
+    "hidden",
+    !eyebrow
+  );
   backButton.classList.toggle("hidden", !showBack);
   topAction.innerHTML = actionHtml;
 }
@@ -220,8 +222,7 @@ nearbyMonitor.start();
 
 function renderHome() {
   setTopbar({
-    title: "홈",
-    eyebrow: "Hanium Traffic"
+    title: "CCTV"
   });
 
   setActiveNav("home");
@@ -232,34 +233,28 @@ function renderHome() {
     locationState?.checkedAt
       ? new Date(locationState.checkedAt)
           .toLocaleString("ko-KR")
-      : "아직 검색하지 않음";
+      : "위치 미확인";
 
   app.innerHTML = `
     <section class="hero">
-      <div class="hero-kicker">GPS CCTV SEARCH</div>
-      <h2>주변 CCTV를 검색하세요</h2>
-      <p>
-        현재 휴대폰 위치가 설정 반경 안에 들어오면
-        해당 CCTV가 초록색으로 활성화됩니다.
-        비활성 CCTV도 클릭해서 영상을 볼 수 있습니다.
-      </p>
+      <h2>주변 CCTV</h2>
 
       <button
         id="gpsSearchButton"
         class="primary-button"
         type="button"
       >
-        현재 위치에서 검색
+        위치 확인
       </button>
     </section>
 
     <div class="status-card">
-      <span>마지막 GPS 확인</span>
+      <span>최근 업데이트</span>
       <strong>${escapeHtml(checkedText)}</strong>
 
       ${
         locationState?.accuracy
-          ? `<small>GPS 정확도 ±${Math.round(locationState.accuracy)}m</small>`
+          ? `<small>정확도 ±${Math.round(locationState.accuracy)}m</small>`
           : ""
       }
     </div>
@@ -269,7 +264,6 @@ function renderHome() {
         <section>
           <div class="section-heading">
             <div>
-              <span class="section-eyebrow">CCTV</span>
               <h2>${escapeHtml(area)}</h2>
             </div>
             <small>${cctvs.length}대</small>
@@ -280,14 +274,11 @@ function renderHome() {
               const state = stateMap.get(cctv.id);
               const active = state?.nearby === true;
 
-              let subText = "검색 전";
+              let subText = "위치 미확인";
 
-              if (state?.configured === false) {
-                subText = "GPS 좌표 미설정";
-              } else if (state?.distanceM != null) {
+              if (state?.distanceM != null) {
                 subText =
-                  `${Math.round(state.distanceM)}m · ` +
-                  `${Math.round(state.radiusM)}m 범위`;
+                  `${Math.round(state.distanceM)}m`;
               }
 
               return `
@@ -327,7 +318,7 @@ function renderHome() {
       const button = event.currentTarget;
 
       button.disabled = true;
-      button.textContent = "GPS 확인 중…";
+      button.textContent = "확인 중…";
 
       try {
         const position = await getCurrentPosition();
@@ -339,17 +330,15 @@ function renderHome() {
         );
 
         saveLocationState(locationState);
-
-        // GPS 검색 시점을 "실시간 시뮬레이션 시작점"으로 사용.
         nearbyMonitor.startNew();
 
-        toast("주변 CCTV 상태를 갱신했습니다.");
+        toast("위치를 업데이트했습니다.");
         renderHome();
       } catch (error) {
         toast(error.message);
 
         button.disabled = false;
-        button.textContent = "현재 위치에서 검색";
+        button.textContent = "위치 확인";
       }
     });
 }
@@ -369,11 +358,7 @@ function renderNotifications() {
     app.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">♢</div>
-        <h2>아직 알림이 없습니다</h2>
-        <p>
-          GPS로 근처 CCTV를 활성화하면,
-          앱이 열려 있는 동안 과속/신호위반 이벤트를 감지해 기록합니다.
-        </p>
+        <h2>새 알림이 없습니다</h2>
       </div>
     `;
   } else {
@@ -446,23 +431,19 @@ function renderSettings() {
 
   setActiveNav("settings");
 
-  const releaseReady =
-    !RELEASE.GITHUB_OWNER.includes("YOUR_GITHUB_ID") &&
-    !RELEASE.REPOSITORY.includes("YOUR_GITHUB_ID");
-
   app.innerHTML = `
     <div class="settings-stack">
       <section class="setting-card">
         <div class="setting-copy">
           <h2>알림</h2>
           <p>
-            현재 브라우저 권한:
+            권한
             <strong>${escapeHtml(notificationPermissionLabel())}</strong>
           </p>
         </div>
 
         <label class="setting-row">
-          <span>앱 알림 사용</span>
+          <span>알림 사용</span>
           <input
             id="notificationsEnabled"
             type="checkbox"
@@ -475,72 +456,24 @@ function renderSettings() {
           class="secondary-button"
           type="button"
         >
-          알림 권한 요청
+          알림 권한 설정
         </button>
       </section>
 
       <section class="setting-card">
         <div class="setting-copy">
-          <h2>속도 판정 기준</h2>
-          <p>
-            별도 판정 규칙이 확정되기 전까지 사용하는 임시 기준입니다.
-          </p>
+          <h2>위치 감지</h2>
         </div>
 
         <label class="number-setting">
-          <span>제한속도</span>
-          <div>
-            <input
-              id="speedLimit"
-              type="number"
-              min="1"
-              max="200"
-              value="${escapeHtml(settings.speedLimitKmh)}"
-            >
-            <small>km/h</small>
-          </div>
-        </label>
-
-        <label class="number-setting">
-          <span>위험 판정 추가 초과값</span>
-          <div>
-            <input
-              id="dangerOver"
-              type="number"
-              min="0"
-              max="100"
-              value="${escapeHtml(settings.dangerOverKmh)}"
-            >
-            <small>km/h</small>
-          </div>
-        </label>
-
-        <div class="rule-box">
-          안전 ≤ ${escapeHtml(settings.speedLimitKmh)} km/h<br>
-          주의 &gt; ${escapeHtml(settings.speedLimitKmh)} km/h<br>
-          위험 ≥ ${
-            Number(settings.speedLimitKmh) +
-            Number(settings.dangerOverKmh)
-          } km/h 또는 신호 위반
-        </div>
-      </section>
-
-      <section class="setting-card">
-        <div class="setting-copy">
-          <h2>GPS 반경</h2>
-          <p>
-            0m이면 CCTV별 <code>radiusM</code> 설정을 사용합니다.
-          </p>
-        </div>
-
-        <label class="number-setting">
-          <span>전체 CCTV 반경 덮어쓰기</span>
+          <span>감지 반경</span>
           <div>
             <input
               id="gpsRadius"
               type="number"
-              min="0"
-              max="10000"
+              min="100"
+              max="5000"
+              step="50"
               value="${escapeHtml(settings.gpsRadiusOverrideM)}"
             >
             <small>m</small>
@@ -550,10 +483,7 @@ function renderSettings() {
 
       <section class="setting-card">
         <div class="setting-copy">
-          <h2>PWA 설치</h2>
-          <p>
-            지원되는 브라우저에서는 홈 화면에 앱 형태로 설치할 수 있습니다.
-          </p>
+          <h2>앱 설치</h2>
         </div>
 
         <button
@@ -564,33 +494,15 @@ function renderSettings() {
         >
           ${
             deferredInstallPrompt
-              ? "앱 설치"
-              : "브라우저 설치 메뉴 사용"
+              ? "설치"
+              : "설치 옵션 없음"
           }
         </button>
       </section>
 
       <section class="setting-card">
         <div class="setting-copy">
-          <h2>GitHub Releases</h2>
-          <p>
-            ${releaseReady ? "Release 연결 설정됨" : "js/config.js에서 GitHub ID 수정 필요"}
-          </p>
-        </div>
-
-        <div class="code-box">
-          Owner: ${escapeHtml(RELEASE.GITHUB_OWNER)}<br>
-          Repository: ${escapeHtml(RELEASE.REPOSITORY)}<br>
-          Tag: ${escapeHtml(RELEASE.TAG)}
-        </div>
-      </section>
-
-      <section class="setting-card">
-        <div class="setting-copy">
           <h2>알림 기록</h2>
-          <p>
-            이 기기의 브라우저에 저장된 기록만 삭제합니다.
-          </p>
         </div>
 
         <button
@@ -598,7 +510,7 @@ function renderSettings() {
           class="danger-button"
           type="button"
         >
-          알림 기록 삭제
+          전체 삭제
         </button>
       </section>
     </div>
@@ -614,36 +526,11 @@ function renderSettings() {
     });
 
   document
-    .querySelector("#speedLimit")
-    .addEventListener("change", (event) => {
-      settings.speedLimitKmh = Math.max(
-        1,
-        Number(event.target.value) ||
-        DEFAULT_SETTINGS.speedLimitKmh
-      );
-
-      saveSettings(settings);
-      renderSettings();
-    });
-
-  document
-    .querySelector("#dangerOver")
-    .addEventListener("change", (event) => {
-      settings.dangerOverKmh = Math.max(
-        0,
-        Number(event.target.value) || 0
-      );
-
-      saveSettings(settings);
-      renderSettings();
-    });
-
-  document
     .querySelector("#gpsRadius")
     .addEventListener("change", (event) => {
       settings.gpsRadiusOverrideM = Math.max(
-        0,
-        Number(event.target.value) || 0
+        100,
+        Number(event.target.value) || 500
       );
 
       saveSettings(settings);
@@ -657,10 +544,10 @@ function renderSettings() {
 
       toast(
         result.granted
-          ? "알림 권한이 허용되었습니다."
+          ? "알림이 활성화되었습니다."
           : (
               result.reason ||
-              `알림 권한 상태: ${result.permission}`
+              `알림 권한: ${result.permission}`
             )
       );
 
@@ -679,9 +566,6 @@ function renderSettings() {
     .querySelector("#installApp")
     .addEventListener("click", async () => {
       if (!deferredInstallPrompt) {
-        toast(
-          "Chrome/Edge의 '앱 설치' 또는 '홈 화면에 추가' 메뉴를 사용해주세요."
-        );
         return;
       }
 
@@ -791,9 +675,7 @@ async function renderCctv(route) {
 
   setTopbar({
     title: cctv.name,
-    eyebrow:
-      `${cctv.area} · ` +
-      `${isNearby(cctv.id) ? "GPS 활성" : "GPS 비활성"}`,
+    eyebrow: cctv.area,
     showBack: true
   });
 
@@ -801,7 +683,7 @@ async function renderCctv(route) {
 
   app.innerHTML = `
     <div class="loading-card">
-      CSV 데이터를 불러오는 중…
+      데이터를 불러오는 중…
     </div>
   `;
 
@@ -812,12 +694,8 @@ async function renderCctv(route) {
   } catch (error) {
     app.innerHTML = `
       <div class="empty-state">
-        <h2>CSV 로드 실패</h2>
+        <h2>데이터를 불러오지 못했습니다</h2>
         <p>${escapeHtml(error.message)}</p>
-        <p>
-          <code>files/</code>의 파일명과
-          <code>js/config.js</code> 경로를 확인하세요.
-        </p>
       </div>
     `;
 
@@ -843,7 +721,7 @@ async function renderCctv(route) {
 
   // 영상 재생 중 알림용 이벤트.
   const cctvEvents =
-    buildCctvEvents(cctv, data, settings);
+    buildCctvEvents(cctv, data);
 
   app.innerHTML = `
     <section class="video-card">
@@ -862,8 +740,8 @@ async function renderCctv(route) {
       </div>
 
       <div class="video-meta">
-        <span id="videoModeLabel">원본 영상</span>
-        <span id="frameLabel">Frame 0 · 0.00s</span>
+        <span id="videoModeLabel">원본</span>
+        <span id="frameLabel" class="hidden">Frame 0</span>
       </div>
     </section>
 
@@ -923,7 +801,7 @@ async function renderCctv(route) {
   function modeLabel(mode) {
     if (mode === "yolo") return "객체 탐지";
     if (mode === "twin") return "Twin";
-    return "원본 영상";
+    return "원본";
   }
 
   function syncTabs(mode) {
@@ -946,36 +824,7 @@ async function renderCctv(route) {
   }
 
   function renderVideoInfo() {
-    detailPanel.innerHTML = `
-      <div class="video-info-card">
-        <div>
-          <span class="section-eyebrow">
-            CCTV STATUS
-          </span>
-
-          <h2>${escapeHtml(cctv.name)}</h2>
-        </div>
-
-        <div class="info-grid">
-          <div>
-            <span>GPS</span>
-            <strong>
-              ${isNearby(cctv.id) ? "활성" : "비활성"}
-            </strong>
-          </div>
-
-          <div>
-            <span>FPS</span>
-            <strong>${escapeHtml(cctv.fps)}</strong>
-          </div>
-        </div>
-
-        <p>
-          원본 / 객체 탐지 / Twin 전환 시
-          현재 영상 시간을 그대로 유지합니다.
-        </p>
-      </div>
-    `;
+    detailPanel.innerHTML = "";
   }
 
   function renderAnalysis(analysis) {
@@ -1035,7 +884,7 @@ async function renderCctv(route) {
             <tr>
               <th>ID</th>
               <th>현재 속도</th>
-              <th>순간 최고속도</th>
+              <th>최고 속도</th>
               <th>관측 시간</th>
               <th>신호 위반</th>
               <th>판정</th>
@@ -1139,11 +988,6 @@ async function renderCctv(route) {
           </tbody>
         </table>
       </div>
-
-      <div class="analysis-note">
-        현재 Frame까지 speed.csv의 관측값만 사용해 집계합니다.
-        기본 판정 기준은 설정 화면에서 변경할 수 있습니다.
-      </div>
     `;
 
     detailPanel
@@ -1204,8 +1048,7 @@ async function renderCctv(route) {
           analyzeAtFrame(
             cctv,
             data,
-            state.currentFrame,
-            settings
+            state.currentFrame
           );
 
         if (activePanel === "analysis") {
@@ -1297,8 +1140,7 @@ async function renderCctv(route) {
         analyzeAtFrame(
           cctv,
           data,
-          controller.currentFrame(),
-          settings
+          controller.currentFrame()
         );
 
       renderAnalysis(currentAnalysis);
@@ -1309,8 +1151,7 @@ async function renderCctv(route) {
       analyzeAtFrame(
         cctv,
         data,
-        0,
-        settings
+        0
       );
 
     renderAnalysis(currentAnalysis);
