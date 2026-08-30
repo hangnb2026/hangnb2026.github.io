@@ -14,31 +14,62 @@ function latestViolationAtOrBefore(items, currentFrame) {
   return found;
 }
 
-export function classifyVehicle(maxSpeed, violation, settings) {
+function speedRules(cctv) {
+  return {
+    caution: Number(cctv.cautionSpeedKmh) || 50,
+    danger: Number(cctv.dangerSpeedKmh) || 100,
+    noise: Number(cctv.noiseSpeedKmh) || 150
+  };
+}
+
+function isNoiseSeries(cctv, series) {
+  const { noise } = speedRules(cctv);
+
+  return (
+    Number.isFinite(series.maxAll) &&
+    series.maxAll >= noise
+  );
+}
+
+export function classifyVehicle(maxSpeed, violation, cctv) {
   if (violation) return "danger";
 
-  const speedLimit = Number(settings.speedLimitKmh) || 60;
-  const dangerSpeed = speedLimit + (Number(settings.dangerOverKmh) || 20);
+  const { caution, danger } = speedRules(cctv);
 
-  if (Number.isFinite(maxSpeed) && maxSpeed >= dangerSpeed) {
+  if (
+    Number.isFinite(maxSpeed) &&
+    maxSpeed >= danger
+  ) {
     return "danger";
   }
 
-  if (Number.isFinite(maxSpeed) && maxSpeed > speedLimit) {
+  if (
+    Number.isFinite(maxSpeed) &&
+    maxSpeed >= caution
+  ) {
     return "caution";
   }
 
   return "safe";
 }
 
-export function analyzeAtFrame(cctv, data, currentFrame, settings) {
+export function analyzeAtFrame(cctv, data, currentFrame) {
   const vehicles = [];
 
   let totalSampleSum = 0;
   let totalSampleCount = 0;
 
+  const { danger } = speedRules(cctv);
+
   for (const [vehicleId, series] of data.speed.entries()) {
-    if (series.firstFrame == null || series.firstFrame > currentFrame) {
+    if (isNoiseSeries(cctv, series)) {
+      continue;
+    }
+
+    if (
+      series.firstFrame == null ||
+      series.firstFrame > currentFrame
+    ) {
       continue;
     }
 
@@ -51,18 +82,30 @@ export function analyzeAtFrame(cctv, data, currentFrame, settings) {
     totalSampleSum += sample.sum;
     totalSampleCount += sample.count;
 
-    const observedLastFrame = Math.min(series.lastFrame, currentFrame);
+    const observedLastFrame =
+      Math.min(series.lastFrame, currentFrame);
+
     const observationSec =
-      Math.max(0, observedLastFrame - series.firstFrame) / cctv.fps;
+      Math.max(
+        0,
+        observedLastFrame - series.firstFrame
+      ) / cctv.fps;
 
-    const violation = latestViolationAtOrBefore(
-      data.violationIndex.get(vehicleId),
-      currentFrame
-    );
+    const violation =
+      latestViolationAtOrBefore(
+        data.violationIndex.get(vehicleId),
+        currentFrame
+      );
 
-    const firstOverspeed = series.firstAbove(Number(settings.speedLimitKmh) || 60);
+    const firstDanger =
+      series.firstAtOrAbove(danger);
 
-    const status = classifyVehicle(maxSpeed, violation, settings);
+    const status =
+      classifyVehicle(
+        maxSpeed,
+        violation,
+        cctv
+      );
 
     let sceneFrame = null;
     let sceneReason = null;
@@ -71,11 +114,11 @@ export function analyzeAtFrame(cctv, data, currentFrame, settings) {
       sceneFrame = violation.startFrame;
       sceneReason = "신호 위반";
     } else if (
-      firstOverspeed &&
-      firstOverspeed.frame <= currentFrame &&
+      firstDanger &&
+      firstDanger.frame <= currentFrame &&
       status === "danger"
     ) {
-      sceneFrame = firstOverspeed.frame;
+      sceneFrame = firstDanger.frame;
       sceneReason = "과속";
     }
 
@@ -99,70 +142,125 @@ export function analyzeAtFrame(cctv, data, currentFrame, settings) {
   };
 
   vehicles.sort((a, b) => {
-    if (statusRank[a.status] !== statusRank[b.status]) {
-      return statusRank[a.status] - statusRank[b.status];
+    if (
+      statusRank[a.status] !==
+      statusRank[b.status]
+    ) {
+      return (
+        statusRank[a.status] -
+        statusRank[b.status]
+      );
     }
 
-    return Number(b.maxSpeed || 0) - Number(a.maxSpeed || 0);
+    return (
+      Number(b.maxSpeed || 0) -
+      Number(a.maxSpeed || 0)
+    );
   });
 
   return {
     recognizedCount: vehicles.length,
+
     averageSpeed:
       totalSampleCount > 0
         ? totalSampleSum / totalSampleCount
         : 0,
-    dangerCount: vehicles.filter((vehicle) => vehicle.status === "danger").length,
-    cautionCount: vehicles.filter((vehicle) => vehicle.status === "caution").length,
-    safeCount: vehicles.filter((vehicle) => vehicle.status === "safe").length,
+
+    dangerCount:
+      vehicles.filter(
+        (vehicle) =>
+          vehicle.status === "danger"
+      ).length,
+
+    cautionCount:
+      vehicles.filter(
+        (vehicle) =>
+          vehicle.status === "caution"
+      ).length,
+
+    safeCount:
+      vehicles.filter(
+        (vehicle) =>
+          vehicle.status === "safe"
+      ).length,
+
     vehicles
   };
 }
 
-export function buildCctvEvents(cctv, data, settings) {
+export function buildCctvEvents(cctv, data) {
   const events = [];
-  const speedLimit = Number(settings.speedLimitKmh) || 60;
+  const { caution } = speedRules(cctv);
+  const noiseIds = new Set();
 
-  // 차량별 최초 제한속도 초과 시점 1회.
   for (const [vehicleId, series] of data.speed.entries()) {
-    const firstOverspeed = series.firstAbove(speedLimit);
+    if (isNoiseSeries(cctv, series)) {
+      noiseIds.add(String(vehicleId));
+      continue;
+    }
+
+    const firstOverspeed =
+      series.firstAtOrAbove(caution);
 
     if (firstOverspeed) {
       events.push({
-        eventKey: `${cctv.id}:overspeed:${vehicleId}:${firstOverspeed.frame}`,
+        eventKey:
+          `${cctv.id}:overspeed:${vehicleId}:${firstOverspeed.frame}`,
+
         cctvId: cctv.id,
         vehicleId,
         frame: firstOverspeed.frame,
         type: "overspeed",
         label: "과속",
+
         message:
-          `${vehicleId}번 차량이 ${firstOverspeed.value.toFixed(1)} km/h로 ` +
-          `설정 제한속도 ${speedLimit} km/h를 초과했습니다.`
+          `${vehicleId}번 차량 · ` +
+          `${firstOverspeed.value.toFixed(1)} km/h`
       });
     }
   }
 
-  // 위반은 각 violation 구간의 시작 frame 기준으로 알림.
   for (const violation of data.violations) {
+    if (
+      noiseIds.has(
+        String(violation.vehicleId)
+      )
+    ) {
+      continue;
+    }
+
     events.push({
       eventKey:
         `${cctv.id}:violation:${violation.vehicleId}:${violation.startFrame}`,
+
       cctvId: cctv.id,
       vehicleId: violation.vehicleId,
       frame: violation.startFrame,
       type: "violation",
       label: "신호 위반",
-      message: `${violation.vehicleId}번 차량의 신호 위반이 감지되었습니다.`
+      message:
+        `${violation.vehicleId}번 차량 · 신호 위반`
     });
   }
 
-  events.sort((a, b) => a.frame - b.frame);
+  events.sort(
+    (a, b) => a.frame - b.frame
+  );
 
   return events;
 }
 
-export function eventsBetweenFrames(events, startExclusive, endInclusive) {
-  if (endInclusive < startExclusive) return [];
+export function eventsBetweenFrames(
+  events,
+  startExclusive,
+  endInclusive
+) {
+  if (
+    endInclusive <
+    startExclusive
+  ) {
+    return [];
+  }
 
   return events.filter(
     (event) =>
