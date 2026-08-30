@@ -59,8 +59,7 @@ export async function showSystemNotification(title, body, hash) {
 export async function recordEvent(cctv, event, settings) {
   const hash =
     `#/cctv/${encodeURIComponent(cctv.id)}` +
-    `?tab=analysis` +
-    `&vehicle=${encodeURIComponent(event.vehicleId)}` +
+    `?vehicle=${encodeURIComponent(event.vehicleId)}` +
     `&frame=${encodeURIComponent(event.frame)}`;
 
   const item = {
