@@ -34,8 +34,7 @@ export class NearbyMonitor {
     const data = await loadCctvData(cctv);
     const events = buildCctvEvents(
       cctv,
-      data,
-      this.getSettings()
+      data
     );
 
     const prepared = {
