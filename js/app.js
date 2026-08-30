@@ -76,12 +76,15 @@ function toast(message) {
   node.className = "toast";
   node.textContent = message;
 
-  toastArea.appendChild(node);
+  // 알림이 연속으로 발생해도 화면을 덮지 않도록
+  // 가장 최근 알림 하나만 상단에 표시한다.
+  toastArea.replaceChildren(node);
 
-  window.setTimeout(
-    () => node.remove(),
-    3300
-  );
+  window.setTimeout(() => {
+    if (node.isConnected) {
+      node.remove();
+    }
+  }, 2800);
 }
 
 function setTopbar({
@@ -222,7 +225,7 @@ nearbyMonitor.start();
 
 function renderHome() {
   setTopbar({
-    title: "CCTV"
+    title: "Traffic 도우미"
   });
 
   setActiveNav("home");
@@ -607,36 +610,40 @@ function signalColor(value) {
   return "";
 }
 
+function isSignalMetadataKey(key) {
+  const normalized =
+    String(key ?? "")
+      .trim()
+      .toLowerCase();
+
+  return (
+    normalized.includes("note") ||
+    normalized.includes("confidence") ||
+    normalized === "conf" ||
+    normalized.includes("score") ||
+    normalized.includes("prob") ||
+    normalized.includes("remark") ||
+    normalized.includes("memo") ||
+    normalized.includes("비고") ||
+    normalized.includes("신뢰")
+  );
+}
+
 function signalOverlayHtml(signal, frame, timeSec) {
-  if (!signal) {
-    return `
-      <span class="signal-chip neutral">
-        신호정보 없음
-      </span>
-    `;
-  }
+  if (!signal) return "";
 
   const record = signal.at(frame, timeSec);
-
-  if (!record) {
-    return `
-      <span class="signal-chip neutral">
-        신호정보 대기
-      </span>
-    `;
-  }
+  if (!record) return "";
 
   const entries =
     Object.entries(record.values)
+      .filter(([key, value]) =>
+        !isSignalMetadataKey(key) &&
+        String(value ?? "").trim() !== ""
+      )
       .slice(0, 8);
 
-  if (!entries.length) {
-    return `
-      <span class="signal-chip neutral">
-        신호 데이터
-      </span>
-    `;
-  }
+  if (!entries.length) return "";
 
   return entries.map(([key, value]) => `
     <span
@@ -702,11 +709,6 @@ async function renderCctv(route) {
     return;
   }
 
-  let activePanel =
-    route.params.get("tab") === "analysis"
-      ? "analysis"
-      : "video";
-
   let filter = "all";
 
   const focusedVehicle =
@@ -719,7 +721,6 @@ async function renderCctv(route) {
   let currentAnalysis = null;
   let lastAnalysisRenderAt = 0;
 
-  // 영상 재생 중 알림용 이벤트.
   const cctvEvents =
     buildCctvEvents(cctv, data);
 
@@ -741,17 +742,20 @@ async function renderCctv(route) {
 
       <div class="video-meta">
         <span id="videoModeLabel">원본</span>
-        <span id="frameLabel" class="hidden">Frame 0</span>
+        <span class="live-indicator">
+          <i></i>
+          분석 중
+        </span>
       </div>
     </section>
 
-    <div class="view-tabs">
+    <div class="view-tabs view-tabs-video-only">
       <button
         type="button"
         data-video-mode="original"
         class="active"
       >
-        원본 영상
+        원본
       </button>
 
       <button
@@ -767,20 +771,24 @@ async function renderCctv(route) {
       >
         Twin
       </button>
-
-      <button
-        type="button"
-        data-analysis-tab
-        class="${activePanel === "analysis" ? "active" : ""}"
-      >
-        분석
-      </button>
     </div>
 
-    <section
-      id="detailPanel"
-      class="detail-panel"
-    ></section>
+    <section class="analysis-section">
+      <div class="analysis-heading">
+        <div>
+          <span class="section-eyebrow">REAL-TIME</span>
+          <h2>교통 분석</h2>
+        </div>
+        <span class="speed-limit-chip">
+          제한 ${numberText(cctv.cautionSpeedKmh, 0)} km/h
+        </span>
+      </div>
+
+      <section
+        id="detailPanel"
+        class="detail-panel"
+      ></section>
+    </section>
   `;
 
   const video =
@@ -788,9 +796,6 @@ async function renderCctv(route) {
 
   const signalOverlay =
     document.querySelector("#signalOverlay");
-
-  const frameLabel =
-    document.querySelector("#frameLabel");
 
   const videoModeLabel =
     document.querySelector("#videoModeLabel");
@@ -810,21 +815,9 @@ async function renderCctv(route) {
       .forEach((button) => {
         button.classList.toggle(
           "active",
-          activePanel !== "analysis" &&
           button.dataset.videoMode === mode
         );
       });
-
-    document
-      .querySelector("[data-analysis-tab]")
-      .classList.toggle(
-        "active",
-        activePanel === "analysis"
-      );
-  }
-
-  function renderVideoInfo() {
-    detailPanel.innerHTML = "";
   }
 
   function renderAnalysis(analysis) {
@@ -834,15 +827,33 @@ async function renderCctv(route) {
         vehicle.status === filter
       );
 
+    const averageCaution =
+      analysis.averageStatus === "caution";
+
     detailPanel.innerHTML = `
-      <div class="metric-grid">
+      <div class="zone-status ${averageCaution ? "caution" : "safe"}">
+        <div class="zone-status-icon">
+          ${averageCaution ? "!" : "✓"}
+        </div>
+
+        <div class="zone-status-copy">
+          <span>구역 상태</span>
+          <strong>${averageCaution ? "주의" : "정상"}</strong>
+          <small>
+            평균 ${numberText(analysis.averageSpeed)} km/h ·
+            제한 ${numberText(analysis.speedLimitKmh, 0)} km/h
+          </small>
+        </div>
+      </div>
+
+      <div class="metric-grid metric-grid-analysis">
         <article class="metric-card">
           <span>인식 차량</span>
           <strong>${analysis.recognizedCount}</strong>
           <small>대</small>
         </article>
 
-        <article class="metric-card">
+        <article class="metric-card ${averageCaution ? "caution" : ""}">
           <span>평균 속도</span>
           <strong>${numberText(analysis.averageSpeed)}</strong>
           <small>km/h</small>
@@ -905,34 +916,16 @@ async function renderCctv(route) {
                     }"
                   >
                     <td>
-                      <strong>
-                        ${escapeHtml(vehicle.vehicleId)}
-                      </strong>
+                      <strong>${escapeHtml(vehicle.vehicleId)}</strong>
                     </td>
 
-                    <td>
-                      ${numberText(vehicle.latestSpeed)}
-                      km/h
-                    </td>
+                    <td>${numberText(vehicle.latestSpeed)} km/h</td>
+                    <td>${numberText(vehicle.maxSpeed)} km/h</td>
+                    <td>${numberText(vehicle.observationSec)} s</td>
+                    <td>${vehicle.violation ? "O" : "X"}</td>
 
                     <td>
-                      ${numberText(vehicle.maxSpeed)}
-                      km/h
-                    </td>
-
-                    <td>
-                      ${numberText(vehicle.observationSec)}
-                      s
-                    </td>
-
-                    <td>
-                      ${vehicle.violation ? "O" : "X"}
-                    </td>
-
-                    <td>
-                      <span
-                        class="status-badge ${vehicle.status}"
-                      >
+                      <span class="status-badge ${vehicle.status}">
                         ${statusKorean(vehicle.status)}
                       </span>
                     </td>
@@ -980,7 +973,7 @@ async function renderCctv(route) {
                 : `
                   <tr>
                     <td colspan="7">
-                      해당 판정 차량이 없습니다.
+                      해당 차량이 없습니다.
                     </td>
                   </tr>
                 `
@@ -1015,10 +1008,7 @@ async function renderCctv(route) {
               frame
             );
 
-            activePanel = "video";
             syncTabs(mode);
-            renderVideoInfo();
-
             videoModeLabel.textContent =
               modeLabel(mode);
           } catch (error) {
@@ -1033,10 +1023,6 @@ async function renderCctv(route) {
       video,
       cctv,
       async (state) => {
-        frameLabel.textContent =
-          `Frame ${state.currentFrame} · ` +
-          `${state.currentTime.toFixed(2)}s`;
-
         signalOverlay.innerHTML =
           signalOverlayHtml(
             data.signal,
@@ -1051,24 +1037,16 @@ async function renderCctv(route) {
             state.currentFrame
           );
 
-        if (activePanel === "analysis") {
-          const now = performance.now();
+        const now = performance.now();
 
-          if (
-            now - lastAnalysisRenderAt >
-            400
-          ) {
-            lastAnalysisRenderAt = now;
-            renderAnalysis(currentAnalysis);
-          }
+        if (
+          now - lastAnalysisRenderAt >
+          400
+        ) {
+          lastAnalysisRenderAt = now;
+          renderAnalysis(currentAnalysis);
         }
 
-        /*
-         * 해당 CCTV가 GPS 활성 상태이고,
-         * 사용자가 이 영상을 직접 재생하는 경우에도
-         * 이벤트를 즉시 알림 기록한다.
-         * Global nearby monitor와 eventKey가 같으므로 중복 저장되지 않는다.
-         */
         if (
           isNearby(cctv.id) &&
           state.currentFrame >= lastVideoFrame
@@ -1114,9 +1092,7 @@ async function renderCctv(route) {
           const mode =
             button.dataset.videoMode;
 
-          activePanel = "video";
           syncTabs(mode);
-          renderVideoInfo();
 
           try {
             await controller.switchMode(mode);
@@ -1130,34 +1106,14 @@ async function renderCctv(route) {
       );
     });
 
-  document
-    .querySelector("[data-analysis-tab]")
-    .addEventListener("click", () => {
-      activePanel = "analysis";
-      syncTabs(controller.mode);
+  currentAnalysis =
+    analyzeAtFrame(
+      cctv,
+      data,
+      0
+    );
 
-      currentAnalysis =
-        analyzeAtFrame(
-          cctv,
-          data,
-          controller.currentFrame()
-        );
-
-      renderAnalysis(currentAnalysis);
-    });
-
-  if (activePanel === "analysis") {
-    currentAnalysis =
-      analyzeAtFrame(
-        cctv,
-        data,
-        0
-      );
-
-    renderAnalysis(currentAnalysis);
-  } else {
-    renderVideoInfo();
-  }
+  renderAnalysis(currentAnalysis);
 
   try {
     await controller.init();
