@@ -1,9 +1,9 @@
 import { DEFAULT_SETTINGS } from "./config.js";
 
-const SETTINGS_KEY = "haniumTraffic.settings.v2";
-const LOCATION_KEY = "haniumTraffic.location.v2";
-const NOTIFICATIONS_KEY = "haniumTraffic.notifications.v2";
-const MONITOR_KEY = "haniumTraffic.monitor.v2";
+const SETTINGS_KEY = "trafficMonitor.settings.v3";
+const LOCATION_KEY = "trafficMonitor.location.v3";
+const NOTIFICATIONS_KEY = "trafficMonitor.notifications.v3";
+const MONITOR_KEY = "trafficMonitor.monitor.v3";
 
 /*
  * localStorage.getItem()은 값이 없으면 null을 반환합니다.
