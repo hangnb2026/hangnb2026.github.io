@@ -92,6 +92,10 @@ function createSparseSeries(frameArray, valueArray) {
     values: valueArray,
     prefixMax,
     prefixSum,
+    maxAll:
+      Number.isFinite(maxValue)
+        ? maxValue
+        : null,
 
     firstFrame:
       frameArray.length
@@ -142,6 +146,23 @@ function createSparseSeries(frameArray, valueArray) {
       };
     },
 
+    firstAtOrAbove(limit) {
+      for (
+        let i = 0;
+        i < valueArray.length;
+        i++
+      ) {
+        if (valueArray[i] >= limit) {
+          return {
+            frame: frameArray[i],
+            value: valueArray[i]
+          };
+        }
+      }
+
+      return null;
+    },
+
     firstAbove(limit) {
       for (
         let i = 0;
@@ -165,7 +186,7 @@ function createSparseSeries(frameArray, valueArray) {
  * converter가 생성하는 포맷:
  *
  * {
- *   "format": "hanium-speed-v1",
+ *   "format": "traffic-speed-v1",
  *   "vehicles": {
  *     "123": {
  *       "d": [100, 1, 1, 2, ...],
@@ -180,7 +201,6 @@ function createSparseSeries(frameArray, valueArray) {
 export function decodeCompressedSpeedJson(payload) {
   if (
     !payload ||
-    payload.format !== "hanium-speed-v1" ||
     typeof payload.vehicles !== "object"
   ) {
     throw new Error("지원하지 않는 speed 압축 포맷입니다.");
