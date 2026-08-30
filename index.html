@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="description" content="GPS 기반 교통안전 CCTV 분석 PWA">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Hanium Traffic">
+
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./assets/icon-192.png">
+  <link rel="icon" href="./assets/icon-192.png">
+  <link rel="stylesheet" href="./css/style.css">
+
+  <title>Hanium Traffic</title>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <button id="backButton" class="icon-button hidden" type="button" aria-label="뒤로 가기">‹</button>
+      <div class="topbar-copy">
+        <span id="topEyebrow" class="eyebrow">Hanium Traffic</span>
+        <h1 id="topTitle">홈</h1>
+      </div>
+      <div id="topAction" class="top-action"></div>
+    </header>
+
+    <main id="app" class="app-main"></main>
+
+    <nav class="bottom-nav" aria-label="주요 메뉴">
+      <a href="#/" data-nav="home">
+        <span class="nav-icon">⌂</span>
+        <span>홈</span>
+      </a>
+      <a href="#/notifications" data-nav="notifications">
+        <span class="nav-icon">♢</span>
+        <span>알림</span>
+        <b id="notificationBadge" class="notification-badge hidden">0</b>
+      </a>
+      <a href="#/settings" data-nav="settings">
+        <span class="nav-icon">⚙</span>
+        <span>설정</span>
+      </a>
+    </nav>
+  </div>
+
+  <div id="toastArea" class="toast-area" aria-live="assertive"></div>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
