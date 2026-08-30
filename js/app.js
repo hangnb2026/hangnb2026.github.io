@@ -118,11 +118,29 @@ function setActiveNav(name) {
 }
 
 function updateNotificationBadge() {
-  const unreadCount = loadNotifications()
-    .filter((item) => !item.read)
-    .length;
+  /*
+   * store.js에서도 항상 배열을 반환하지만,
+   * 앱 초기화가 저장 데이터 이상 때문에 중단되지 않도록
+   * 여기에서도 한 번 더 방어합니다.
+   */
+  const loaded =
+    loadNotifications();
 
-  notificationBadge.textContent = String(unreadCount);
+  const notifications =
+    Array.isArray(loaded)
+      ? loaded
+      : [];
+
+  const unreadCount =
+    notifications.filter(
+      (item) =>
+        item &&
+        item.read !== true
+    ).length;
+
+  notificationBadge.textContent =
+    String(unreadCount);
+
   notificationBadge.classList.toggle(
     "hidden",
     unreadCount === 0
@@ -1367,15 +1385,35 @@ window.addEventListener(
 if ("serviceWorker" in navigator) {
   window.addEventListener(
     "load",
-    () => {
-      navigator.serviceWorker
-        .register("./sw.js")
-        .catch((error) => {
-          console.error(
-            "Service Worker 등록 실패:",
-            error
+    async () => {
+      try {
+        const registration =
+          await navigator.serviceWorker.register(
+            "./sw.js",
+            {
+              /*
+               * sw.js 자체를 HTTP cache에서 재사용하지 말고
+               * 서버에서 최신 버전을 확인합니다.
+               */
+              updateViaCache: "none"
+            }
           );
-        });
+
+        /*
+         * GitHub Pages에 새 sw.js가 올라온 경우 즉시 확인합니다.
+         */
+        await registration.update();
+
+        console.log(
+          "Service Worker 등록 완료:",
+          registration.scope
+        );
+      } catch (error) {
+        console.error(
+          "Service Worker 등록 실패:",
+          error
+        );
+      }
     }
   );
 }
