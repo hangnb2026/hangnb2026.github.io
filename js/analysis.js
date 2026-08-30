@@ -158,13 +158,22 @@ export function analyzeAtFrame(cctv, data, currentFrame) {
     );
   });
 
+  const averageSpeed =
+    totalSampleCount > 0
+      ? totalSampleSum / totalSampleCount
+      : 0;
+
+  const { caution } = speedRules(cctv);
+
   return {
     recognizedCount: vehicles.length,
-
-    averageSpeed:
-      totalSampleCount > 0
-        ? totalSampleSum / totalSampleCount
-        : 0,
+    averageSpeed,
+    speedLimitKmh: caution,
+    averageStatus:
+      totalSampleCount > 0 &&
+      averageSpeed >= caution
+        ? "caution"
+        : "safe",
 
     dangerCount:
       vehicles.filter(
