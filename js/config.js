@@ -1,7 +1,7 @@
 export const RELEASE = {
   GITHUB_OWNER: "hangnb2026",
   REPOSITORY: "hangnb2026.github.io",
-  TAG: "videos-v1"
+  TAG: "videos-v2"
 };
 
 export const DEFAULT_SETTINGS = {
@@ -115,11 +115,11 @@ export const CCTV_LIST = [
     files: {
       speed: "./files/올림픽공원남단1_speed.json.gz",
       result: "./files/올림픽공원남단1_result.csv",
-      violation: "./files/올림픽공원남단1_stopline_violations.csv",
+      violation: "./files/올림픽공원남단1_violations.csv",
       signal: "./files/올림픽공원남단1_signal.csv"
     },
 
-    violationFormat: "singleFrame"
+    violationFormat: "range"
   },
 
   {
