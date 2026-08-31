@@ -649,7 +649,7 @@ function signalOverlayHtml(signal, frame, timeSec) {
     <span
       class="signal-chip ${signalColor(value)}"
     >
-      ${escapeHtml(key)} · ${escapeHtml(value)}
+      ${escapeHtml(key)}
     </span>
   `).join("");
 }
