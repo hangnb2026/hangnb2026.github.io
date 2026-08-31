@@ -81,8 +81,7 @@ code {
   position: sticky;
   top: 0;
   z-index: 50;
-  display: grid;
-  grid-template-columns: 42px 1fr auto;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
   align-items: center;
   gap: 9px;
   min-height: 72px;
@@ -96,6 +95,7 @@ code {
 }
 
 .topbar-copy {
+  grid-column: 2;
   min-width: 0;
 }
 
@@ -132,6 +132,7 @@ code {
 .top-action {
   display: flex;
   align-items: center;
+  grid-column: 3;
 }
 
 .text-button {
